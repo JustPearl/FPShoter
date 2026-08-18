@@ -30,6 +30,11 @@ export class WeaponSystem {
         // Shell casings
         this.shellCasings = [];
         
+        // Create weapon group first (before setupWeapons needs it)
+        this.weaponGroup = new THREE.Group();
+        this.camera.add(this.weaponGroup);
+        this.weaponGroup.position.set(0.3, -0.25, -0.5);
+        
         this.setupWeapons();
         this.createWeaponModel();
     }
@@ -51,15 +56,7 @@ export class WeaponSystem {
     }
     
     createWeaponModel() {
-        // Create weapon group attached to camera
-        this.weaponGroup = new THREE.Group();
-        this.camera.add(this.weaponGroup);
-        
-        // Position weapon in view
-        this.weaponGroup.position.set(0.3, -0.25, -0.5);
-        
-        // Create simple weapon model
-        this.createPistolModel();
+        // Create muzzle flash light and sprite (weapon group already created in constructor)
         
         // Muzzle flash light
         this.muzzleFlashLight = new THREE.PointLight(0xffaa00, 0, 10);
@@ -71,6 +68,9 @@ export class WeaponSystem {
         this.muzzleFlashSprite.visible = false;
         this.muzzleFlashSprite.position.set(0, 0.1, -0.6);
         this.weaponGroup.add(this.muzzleFlashSprite);
+        
+        // Create initial pistol model
+        this.createPistolModel();
     }
     
     createPistolModel() {
@@ -213,7 +213,20 @@ export class WeaponSystem {
         this.currentWeapon = weaponData;
         this.isFiring = false;
         
-        // Update model
+        // Clear existing weapon meshes (but keep muzzle flash elements)
+        const childrenToRemove = [];
+        this.weaponGroup.children.forEach(child => {
+            if (child !== this.muzzleFlashLight && child !== this.muzzleFlashSprite) {
+                childrenToRemove.push(child);
+            }
+        });
+        childrenToRemove.forEach(child => {
+            child.geometry?.dispose();
+            child.material?.dispose();
+            this.weaponGroup.remove(child);
+        });
+        
+        // Update model and position based on weapon type
         if (weaponId === 'pistol') {
             this.createPistolModel();
             this.weaponGroup.position.set(0.3, -0.25, -0.5);
@@ -221,10 +234,6 @@ export class WeaponSystem {
             this.createRifleModel();
             this.weaponGroup.position.set(0.35, -0.3, -0.6);
         }
-        
-        // Re-add muzzle flash elements
-        this.weaponGroup.add(this.muzzleFlashLight);
-        this.weaponGroup.add(this.muzzleFlashSprite);
         
         return true;
     }
