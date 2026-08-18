@@ -7,9 +7,11 @@ import * as THREE from 'three';
 import { ENEMIES_DATA } from '../data/enemies.js';
 
 export class EnemySystem {
-    constructor(scene, player) {
+    constructor(scene, player, particles, audio) {
         this.scene = scene;
         this.player = player;
+        this.particles = particles;
+        this.audio = audio;
         
         this.enemies = [];
         this.enemyMeshes = new Map();
@@ -354,6 +356,17 @@ export class EnemySystem {
                 }, 100);
             }
         });
+        
+        // Play hit sound
+        if (this.audio) {
+            this.audio.playEnemyHit(damage);
+        }
+        
+        // Spawn blood particles
+        if (this.particles) {
+            const hitPos = enemy.mesh.position.clone().add(new THREE.Vector3(0, enemy.mesh.userData.height || 1, 0));
+            this.particles.spawnBlood(hitPos, new THREE.Vector3(0, 1, 0), 5);
+        }
         
         return enemy.health <= 0;
     }

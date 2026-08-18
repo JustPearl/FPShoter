@@ -9,6 +9,9 @@ import { PlayerController } from '../core/PlayerController.js';
 import { WeaponSystem } from '../weapons/WeaponSystem.js';
 import { EnemySystem } from '../enemies/EnemySystem.js';
 import { LevelManager } from '../levels/LevelManager.js';
+import { ParticleSystem } from '../effects/ParticleSystem.js';
+import { AudioSystem } from '../audio/AudioSystem.js';
+import { ENEMIES_DATA } from '../data/enemies.js';
 
 export class GameManager {
     constructor() {
@@ -21,6 +24,8 @@ export class GameManager {
         this.weapons = null;
         this.enemies = null;
         this.level = null;
+        this.particles = null;
+        this.audio = null;
         
         this.gameState = 'menu'; // menu, playing, paused, gameover
         this.score = 0;
@@ -61,10 +66,14 @@ export class GameManager {
         this.clock = new THREE.Clock();
         
         // Initialize systems
+        this.audio = new AudioSystem();
+        this.audio.init();
+        
         this.level = new LevelManager(this.scene);
         this.player = new PlayerController(this.camera, this.scene);
-        this.weapons = new WeaponSystem(this.camera, this.scene);
-        this.enemies = new EnemySystem(this.scene, this.player);
+        this.weapons = new WeaponSystem(this.camera, this.scene, this.audio);
+        this.particles = new ParticleSystem(this.scene);
+        this.enemies = new EnemySystem(this.scene, this.player, this.particles, this.audio);
         
         // Setup event listeners
         this.setupEventListeners();
@@ -133,6 +142,9 @@ export class GameManager {
         // Request pointer lock
         document.body.requestPointerLock();
         
+        // Initialize audio on user interaction
+        this.audio.resume();
+        
         // Reset game state
         this.player.reset();
         this.enemies.reset();
@@ -181,6 +193,9 @@ export class GameManager {
         this.weapons.updateRecoil(deltaTime);
         this.weapons.updateShellCasings(deltaTime);
         
+        // Update particles
+        this.particles.update(deltaTime);
+        
         // Handle firing
         if (this.player.input.isMouseButtonDown(0)) {
             const hitInfo = this.weapons.fire(deltaTime);
@@ -212,10 +227,21 @@ export class GameManager {
             const enemy = this.enemies.getEnemyById(enemyMesh.id);
             if (enemy) {
                 const weapon = this.weapons.getCurrentWeapon();
+                
+                // Spawn blood particles
+                this.particles.spawnBlood(hitInfo.point, hitInfo.normal || new THREE.Vector3(0, 1, 0), 8);
+                
+                // Play hit sound
+                this.audio.playEnemyHit(weapon.damage);
+                
                 const killed = this.enemies.takeDamage(enemy.id, weapon.damage);
                 
                 if (killed) {
                     this.score += ENEMIES_DATA[enemy.type].loot.score;
+                    this.audio.playEnemyDeath();
+                    
+                    // More blood on death
+                    this.particles.spawnBlood(enemy.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)), new THREE.Vector3(0, 1, 0), 20);
                 }
             }
         }
@@ -302,6 +328,7 @@ export class GameManager {
     dispose() {
         if (this.level) this.level.clear();
         if (this.enemies) this.enemies.clearAll();
+        if (this.particles) this.particles.clear();
         
         this.renderer.dispose();
         const container = document.getElementById('game-container');
@@ -312,8 +339,5 @@ export class GameManager {
         this.isInitialized = false;
     }
 }
-
-// Import enemy data for score calculation
-import { ENEMIES_DATA } from '../data/enemies.js';
 
 export default GameManager;

@@ -7,9 +7,10 @@ import * as THREE from 'three';
 import { WEAPONS_DATA } from '../data/weapons.js';
 
 export class WeaponSystem {
-    constructor(camera, scene) {
+    constructor(camera, scene, audio) {
         this.camera = camera;
         this.scene = scene;
+        this.audio = audio;
         
         this.currentWeapon = null;
         this.weapons = new Map();
@@ -277,6 +278,18 @@ export class WeaponSystem {
         // Eject shell casing
         this.ejectShellCasing();
         
+        // Spawn muzzle smoke
+        const muzzlePos = new THREE.Vector3(0, 0.1, -0.6);
+        muzzlePos.applyMatrix4(this.weaponGroup.matrixWorld);
+        if (this.audio) {
+            this.audio.spawnMuzzleSmoke?.(muzzlePos);
+        }
+        
+        // Play gunshot sound
+        if (this.audio) {
+            this.audio.playGunshot(this.currentWeapon.id, 0);
+        }
+        
         // Raycast for hit detection
         const hitInfo = this.performRaycast();
         
@@ -417,6 +430,11 @@ export class WeaponSystem {
         
         // Reload animation
         this.weaponGroup.rotation.x = -0.5;
+        
+        // Play reload sound
+        if (this.audio) {
+            this.audio.playReload(this.currentWeapon.id);
+        }
         
         setTimeout(() => {
             this.completeReload();
